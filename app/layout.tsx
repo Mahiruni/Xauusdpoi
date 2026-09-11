@@ -3,6 +3,7 @@ import "./globals.css";
 import "./premium.css";
 import "./brand.css";
 import "./os.css";
+import "../components/iphone-trader-os.css";
 
 export const metadata: Metadata = {
   title: "POI Trader OS",
