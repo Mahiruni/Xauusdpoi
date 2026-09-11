@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./premium.css";
 import "./brand.css";
+import "./os.css";
 
 export const metadata: Metadata = {
   title: "POI Trader OS",
