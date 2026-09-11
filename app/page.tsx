@@ -1,4 +1,4 @@
-import TradingOS from "@/components/trading-os";
+import IphoneTraderOS from "@/components/iphone-trader-os";
 import RightDock from "@/components/right-dock";
 import LiveGoldPrice from "@/components/live-gold-price";
 import AIAssistantOverlay from "@/components/ai-assistant-overlay";
@@ -7,7 +7,7 @@ import FinancialChart from "@/components/financial-chart";
 export default function Page() {
   return (
     <>
-      <TradingOS />
+      <IphoneTraderOS />
       <RightDock />
       <div style={{ position: "fixed", top: 20, right: 190, zIndex: 60 }}>
         <LiveGoldPrice />
