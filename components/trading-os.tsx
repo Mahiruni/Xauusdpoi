@@ -1,172 +1,124 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { DEMO_SETUP, SETUP_STAGES, STRATEGY, fibPrice, fmt, setupReason, setupState } from "@/lib/strategy";
 
 type Tab = "Overview" | "Live Market" | "POI Monitor" | "Setups" | "Journal" | "Backtest" | "Strategy Lab" | "Analytics" | "Psychology" | "Economic Calendar" | "AI Assistant" | "Settings";
 
-type JournalRow = { date: string; session: string; bias: string; outcome: string; followed: boolean };
-
-type ChatMessage = { role: "user" | "ai"; text: string; status?: "CONFIRMED" | "DEVELOPING" | "INVALID" | "UNKNOWN" };
-
-const tabs: { label: Tab; icon: string }[] = [
-  { label: "Overview", icon: "◫" },
-  { label: "Live Market", icon: "⌁" },
-  { label: "POI Monitor", icon: "◎" },
-  { label: "Setups", icon: "◇" },
-  { label: "Journal", icon: "▤" },
-  { label: "Backtest", icon: "↺" },
-  { label: "Strategy Lab", icon: "⚗" },
-  { label: "Analytics", icon: "⌁" },
-  { label: "Psychology", icon: "◌" },
-  { label: "Economic Calendar", icon: "□" },
-  { label: "AI Assistant", icon: "✦" },
-  { label: "Settings", icon: "⚙" },
+const tabs: { label: Tab; icon: string; group: string }[] = [
+  { label: "Overview", icon: "grid", group: "Workspace" },
+  { label: "Live Market", icon: "pulse", group: "Workspace" },
+  { label: "POI Monitor", icon: "target", group: "Workspace" },
+  { label: "Setups", icon: "layers", group: "Workspace" },
+  { label: "Journal", icon: "book", group: "Performance" },
+  { label: "Backtest", icon: "rotate", group: "Performance" },
+  { label: "Strategy Lab", icon: "flask", group: "Research" },
+  { label: "Analytics", icon: "chart", group: "Research" },
+  { label: "Psychology", icon: "brain", group: "Performance" },
+  { label: "Economic Calendar", icon: "calendar", group: "Research" },
+  { label: "AI Assistant", icon: "spark", group: "Tools" },
+  { label: "Settings", icon: "gear", group: "Tools" },
 ];
 
-const initialJournal: JournalRow[] = [
-  { date: "Sep 10", session: "New York", bias: "Bearish", outcome: "+3.8R", followed: true },
-  { date: "Sep 09", session: "London", bias: "Bearish", outcome: "−1.0R", followed: false },
-  { date: "Sep 08", session: "Asia", bias: "Bullish", outcome: "+1.9R", followed: true },
-  { date: "Sep 07", session: "London", bias: "Bearish", outcome: "BE", followed: true },
-];
+const stages = SETUP_STAGES;
 
-const backtestMetrics = [
-  ["Total setups", "146"], ["Win rate", "38.4%"], ["Avg R", "+1.12R"], ["Expectancy", "+0.43R"],
-  ["Profit factor", "1.56"], ["Max drawdown", "−8.4R"], ["TP1 hit rate", "57.5%"], ["TP2 hit rate", "34.2%"],
-];
-
-const sweepStats = [
-  { label: "1 sweep", value: 49 }, { label: "2 sweeps", value: 29 }, { label: "3 sweeps", value: 15 }, { label: "4+ sweeps", value: 7 },
-];
-
-const economicEvents = [
-  { time: "12:30", impact: "High", name: "US CPI", meta: "Demo calendar event" },
-  { time: "14:00", impact: "High", name: "Fed Chair remarks", meta: "Demo calendar event" },
-  { time: "15:30", impact: "Medium", name: "US crude inventories", meta: "Demo calendar event" },
-];
-
-const moods = ["Calm", "Confident", "Fearful", "Frustrated", "Revenge trading", "FOMO", "Tired", "Overconfident"];
-
-function Chip({ children, tone = "amber" }: { children: React.ReactNode; tone?: "amber" | "green" | "red" | "blue" }) {
-  return <span className={`chip ${tone}`}>{children}</span>;
+function Icon({ name, size = 18 }: { name: string; size?: number }) {
+  const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const paths: Record<string, React.ReactNode> = {
+    grid: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
+    pulse: <><path d="M3 12h4l2-7 4 14 2-7h6"/></>,
+    target: <><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></>,
+    layers: <><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></>,
+    book: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 0 4 22V5.5Z"/><path d="M4 5.5V19a3 3 0 0 1 3-3h13"/></>,
+    rotate: <><path d="M20 11a8 8 0 1 0 1 4"/><path d="M20 4v7h-7"/></>,
+    flask: <><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M8 15h8"/></>,
+    chart: <><path d="M4 19V5M4 19h17"/><path d="m7 15 4-5 3 3 5-7"/></>,
+    brain: <><path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 3 3"/><path d="M15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-3 3"/><path d="M9 4v16M15 4v16M9 8h3M12 12h3M9 16h3"/></>,
+    calendar: <><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 9h18"/></>,
+    spark: <><path d="m12 3-1.4 5.6L5 10l5.6 1.4L12 17l1.4-5.6L19 10l-5.6-1.4L12 3Z"/><path d="m19 16-.6 2.4L16 19l2.4.6L19 22l.6-2.4L22 19l-2.4-.6L19 16Z"/></>,
+    gear: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.8 1.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.1h-2.5V20a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1-1.8-1.8.1-.1A1.7 1.7 0 0 0 8.1 15a1.7 1.7 0 0 0-1.6-1H6v-2.5h.5a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 1.8-1.8.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V5h2.5v.5a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.8 1.8-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.5V14h-.5a1.7 1.7 0 0 0-1.6 1Z"/></>,
+    menu: <><path d="M4 6h16M4 12h16M4 18h16"/></>,
+    search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></>,
+    chevron: <path d="m9 18 6-6-6-6"/>,
+    arrow: <><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></>,
+    shield: <><path d="M12 3 20 6v5c0 5-3.3 8.4-8 10-4.7-1.6-8-5-8-10V6l8-3Z"/><path d="m9 12 2 2 4-4"/></>,
+  };
+  return <svg {...common}>{paths[name] ?? paths.grid}</svg>;
 }
 
-function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <section className={`card ${className}`}>{children}</section>;
+function Badge({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "blue" | "coral" | "green" | "amber" }) {
+  return <span className={`os-badge os-${tone}`}>{children}</span>;
 }
 
-function SectionTitle({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
-  return <div className="sectionTitle"><div><h2>{title}</h2>{description ? <p>{description}</p> : null}</div>{action}</div>;
+function Stat({ label, value, meta, tone = "" }: { label: string; value: string; meta: string; tone?: string }) {
+  return <motion.div whileHover={{ y: -2 }} className="os-stat"><span>{label}</span><strong className={tone}>{value}</strong><small>{meta}</small></motion.div>;
 }
 
-function Kpi({ label, value, meta, tone = "" }: { label: string; value: string; meta: string; tone?: "red" | "green" | "amber" | "" }) {
-  return <Card className="kpi"><div className="kpiLabel">{label}</div><div className={`kpiValue ${tone ? `value-${tone}` : ""}`}>{value}</div><div className="kpiMeta">{meta}</div></Card>;
-}
-
-function MarketChart() {
-  const candles = useMemo(() => {
-    const base = [3658,3652,3660,3656,3667,3662,3670,3659,3651,3645,3638,3632,3625,3631,3637,3644,3650,3657,3660,3655,3649,3642,3638,3634];
-    return base.map((close, i) => ({ x: 36 + i * 27, open: close + (i % 3 === 0 ? -5 : 4), close, high: Math.max(close, close + (i % 3 === 0 ? -5 : 4)) + 5, low: Math.min(close, close + (i % 3 === 0 ? -5 : 4)) - 5 }));
-  }, []);
-  const min = 3605, max = 3685;
-  const y = (price: number) => 300 - ((price - min) / (max - min)) * 250;
-  const poi = fibPrice(STRATEGY.poi), sl = fibPrice(STRATEGY.stop), tp1 = fibPrice(STRATEGY.tp1), tp2 = fibPrice(STRATEGY.tp2);
-  return <div className="chartWrap"><div className="chartBadge">DEMO CHART</div><svg viewBox="0 0 720 330" role="img" aria-label="Demo XAUUSD chart with Fibonacci POI levels">
-    {[0,1,2,3,4].map(i => <line key={i} x1="20" x2="700" y1={55+i*55} y2={55+i*55} className="gridLine" />)}
-    <rect x="20" y={y(sl)} width="680" height={Math.max(6, y(poi)-y(sl))} className="poiZone" />
-    {[[sl,"0.95 SL"],[poi,"0.71 POI"],[tp1,"TP1 0.00"],[tp2,"TP2 −0.21"]].map(([p,label]) => <g key={String(label)}><line x1="20" x2="700" y1={y(Number(p))} y2={y(Number(p))} className={String(label).includes("POI") ? "levelLineSvg poiLine" : "levelLineSvg"}/><text x="610" y={y(Number(p))-5} className="levelText">{label}</text></g>)}
-    {candles.map((c, i) => { const up = c.close >= c.open; const top = y(Math.max(c.open,c.close)); const bottom = y(Math.min(c.open,c.close)); return <g key={i} className={up ? "candle up" : "candle down"}><line x1={c.x} x2={c.x} y1={y(c.high)} y2={y(c.low)}/><rect x={c.x-5} width="10" y={top} height={Math.max(2,bottom-top)} rx="1"/></g>; })}
-  </svg></div>;
-}
-
-function FibLevels() {
-  const levels = [["1.00",1,"Swing origin"],["0.95",.95,"Stop reference"],["0.71",.71,"Primary POI"],["0.00",0,"TP1"],["−0.21",-.21,"TP2"]] as const;
-  return <div className="levelList">{levels.map(([label,level,meta]) => <div className={`levelRow ${level===.71 ? "poi" : ""}`} key={label}><div><div className="levelKey">{label}</div><div className="subtle">{meta}</div></div><div className="levelLine"/><div className="levelPrice">{fmt(fibPrice(level))}</div></div>)}</div>;
-}
-
-function SetupTimeline() {
-  return <div className="timeline">{SETUP_STAGES.map((name,index) => <div className={`stage ${index < DEMO_SETUP.stateIndex ? "done" : index === DEMO_SETUP.stateIndex ? "current" : ""}`} key={name}><div className="stageNum">{String(index+1).padStart(2,"0")}</div><div className="stageName">{name}</div></div>)}</div>;
-}
-
-function StatusHero() {
+function SetupState() {
   const state = setupState();
-  const score = state === "VALID" ? 91 : state === "DEVELOPING" ? 72 : 45;
-  return <section className="statusHero"><div><div className="statusTag">● {state}</div><div className="statusTitle">Does the market satisfy Mahir’s system?</div><p className="statusCopy">{setupReason()}</p></div><div className="scoreRing" style={{ "--score": `${score}%` } as React.CSSProperties}><span>{score}%</span></div></section>;
+  const current = DEMO_SETUP.stateIndex;
+  const score = state === "VALID" ? 91 : state === "DEVELOPING" ? 72 : state === "WAIT" ? 44 : 18;
+  return <section className="setup-hero">
+    <div className="setup-hero-main">
+      <div className="setup-kicker"><span className="live-dot"/> SYSTEM EVALUATION <Badge tone="amber">DEMO</Badge></div>
+      <div className="setup-heading"><div><h1>Setup state</h1><p>One decision at a time. The system only advances when its conditions are objectively satisfied.</p></div><div className="setup-score"><div className="score-ring" style={{"--score": `${score * 3.6}deg`} as React.CSSProperties}><div><strong>{score}</strong><span>/100</span></div></div><small>System confidence</small></div></div>
+      <div className="state-callout"><div className={`state-icon ${state.toLowerCase()}`}><Icon name={state === "DEVELOPING" ? "target" : state === "VALID" ? "shield" : "pulse"} size={21}/></div><div><Badge tone={state === "VALID" ? "green" : "amber"}>{state}</Badge><h2>{state === "DEVELOPING" ? "Waiting for internal liquidity" : state === "VALID" ? "All entry conditions aligned" : "Conditions are not complete"}</h2><p>{setupReason()}</p></div></div>
+    </div>
+    <div className="setup-rail">
+      <div className="rail-head"><span>SETUP PROGRESSION</span><strong>{current + 1} / {stages.length}</strong></div>
+      <div className="rail-track">{stages.map((stage, i) => <div key={stage} className={`rail-step ${i < current ? "done" : i === current ? "active" : ""}`}><span>{i < current ? "✓" : String(i + 1).padStart(2, "0")}</span><div><b>{stage}</b>{i === current && <small>Current condition</small>}</div></div>)}</div>
+    </div>
+  </section>;
 }
 
-function RiskCalculator() {
-  const [balance,setBalance] = useState(500);
-  const [riskPct,setRiskPct] = useState(.5);
-  const [entry,setEntry] = useState(fibPrice(.71));
-  const [stop,setStop] = useState(fibPrice(.95));
-  const riskAmount = balance * (riskPct/100);
-  const distance = Math.abs(stop-entry);
-  const rawSize = distance > 0 ? riskAmount/distance : 0;
-  return <div><div className="formGrid"><label className="field">Account balance<input type="number" value={balance} onChange={e=>setBalance(Number(e.target.value)||0)}/></label><label className="field">Risk %<select value={riskPct} onChange={e=>setRiskPct(Number(e.target.value))}><option value="0.25">0.25%</option><option value="0.5">0.50%</option><option value="1">1.00%</option></select></label><label className="field">Entry<input type="number" step="0.01" value={entry} onChange={e=>setEntry(Number(e.target.value)||0)}/></label><label className="field">Stop<input type="number" step="0.01" value={stop} onChange={e=>setStop(Number(e.target.value)||0)}/></label></div><div className="metricList compactMetrics"><div className="metricBox"><span>Risk amount</span><strong>${riskAmount.toFixed(2)}</strong></div><div className="metricBox"><span>Stop distance</span><strong>{distance.toFixed(2)}</strong></div><div className="metricBox"><span>Raw size factor</span><strong>{rawSize.toFixed(3)}</strong></div></div><p className="subtle">Planning aid only. Broker contract sizing must be verified before live use.</p></div>;
+function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: React.ReactNode }) {
+  return <div className="os-page-head"><div><span className="os-eyebrow">{eyebrow}</span><h2>{title}</h2><p>{description}</p></div>{action}</div>;
 }
+
+function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) { return <section className={`os-panel ${className}`}>{children}</section>; }
+function PanelTitle({ title, meta, action }: { title: string; meta?: string; action?: React.ReactNode }) { return <div className="os-panel-title"><div><h3>{title}</h3>{meta && <span>{meta}</span>}</div>{action}</div>; }
 
 function Overview() {
-  const distance = DEMO_SETUP.currentPrice - fibPrice(.71);
-  const plan = ["Weekly direction","Daily direction","Important liquidity","H4/H1 structure","Valid impulse","Fibonacci anchored","Wait for POI","Wait for liquidity","Execute only if aligned"];
-  return <><StatusHero/><SectionTitle title="Market context" description="Demo state — replace with a verified market-data provider before live use." action={<Chip>DEMO / NOT LIVE</Chip>}/><div className="grid grid4"><Kpi label="WEEKLY BIAS" value="BEARISH" meta="Higher-timeframe direction" tone="red"/><Kpi label="DAILY BIAS" value="BEARISH" meta="Aligned with weekly" tone="red"/><Kpi label="H1 STRUCTURE" value="SHIFT" meta="Closed-candle external shift" tone="green"/><Kpi label="POI DISTANCE" value={`${distance >= 0 ? "+" : ""}${fmt(distance)}`} meta="Price minus 0.71" tone="amber"/></div><SectionTitle title="Active setup" description="Valid impulse → Fibonacci → POI → liquidity." action={<Chip tone="red">BEARISH</Chip>}/><div className="grid gridMain"><Card><div className="cardHead"><div><div className="eyebrow">XAUUSD • H1 CONTEXT</div><h2>Structure & Fibonacci</h2></div></div><MarketChart/></Card><div className="stack"><Card className="pad"><div className="eyebrow">FIBONACCI LEVELS</div><h2>Canonical setup</h2><FibLevels/></Card><Card className="pad"><div className="eyebrow">LIQUIDITY CONDITION</div><div className="split"><h2>Waiting</h2><Chip>NOT SWEPT</Chip></div><p className="subtle">Price is inside the POI in this demo, but internal liquidity confirmation is still pending.</p></Card></div></div><SectionTitle title="Setup state" description="Only meaningful state transitions should trigger alerts."/><Card className="pad"><SetupTimeline/></Card><div className="grid grid2 spacedTop"><Card className="pad"><div className="eyebrow">TODAY’S PLAN</div><h2>One process. No improvisation.</h2><div className="checklist">{plan.map((item,i)=><label className="check" key={item}><input type="checkbox" defaultChecked={i<6}/><span>{item}</span></label>)}</div><div className="noTrade">NO SETUP = NO TRADE.</div></Card><Card className="pad"><div className="eyebrow">RISK CALCULATOR</div><h2>Make the loss small enough to follow the plan.</h2><RiskCalculator/></Card></div></>;
+  return <div className="os-content"><SetupState/><div className="os-grid os-grid-4"><Stat label="WEEKLY BIAS" value="BEARISH" meta="Higher timeframe" tone="coral"/><Stat label="DAILY BIAS" value="BEARISH" meta="Aligned with weekly" tone="coral"/><Stat label="H1 STRUCTURE" value="SHIFT" meta="External shift" tone="green"/><Stat label="POI" value={fmt(fibPrice(STRATEGY.poi))} meta="0.71 primary zone" tone="amber"/></div><div className="os-grid os-main-grid"><Panel><PanelTitle title="Decision map" meta="XAUUSD · H1 context" action={<Badge tone="coral">BEARISH</Badge>}/><div className="decision-map"><div className="map-line"/>{["HTF bias","Structure shift","Valid impulse","0.71 POI","Liquidity sweep","Entry"].map((x,i)=><div className={`map-node ${i < 4 ? "done" : i === 4 ? "active" : ""}`} key={x}><span>{i < 4 ? "✓" : String(i+1).padStart(2,"0")}</span><div><b>{x}</b><small>{i < 4 ? "Confirmed" : i === 4 ? "Required next" : "Locked"}</small></div></div>)}</div></Panel><Panel><PanelTitle title="Canonical levels" meta="Mechanical references"/><div className="level-table">{[["0.95","Stop",fibPrice(.95),"coral"],["0.71","Primary POI",fibPrice(.71),"blue"],["0.00","TP1",fibPrice(0),"green"],["−0.21","TP2",fibPrice(-.21),"green"]].map(([level,name,price,tone])=><div className="level-row" key={String(level)}><span className={`level-dot ${tone}`}/><div><b>{name}</b><small>Fib {level}</small></div><strong>{fmt(Number(price))}</strong></div>)}</div></Panel></div><Panel className="process-panel"><PanelTitle title="Execution discipline" meta="The system is designed to prevent premature entries"/><div className="discipline-grid">{["External structure shift before Fibonacci","0.71 is the primary POI","Internal liquidity must be swept","0.95 SL / 0.00 TP1 / −0.21 TP2","No clear condition = no trade"].map((x,i)=><div key={x}><span>0{i+1}</span><p>{x}</p></div>)}</div></Panel></div>;
 }
 
-function LiveMarket() { return <><SectionTitle title="Live Market" description="Prepared for a verified realtime XAUUSD provider." action={<Chip>DEMO FEED</Chip>}/><div className="grid grid4"><Kpi label="XAUUSD" value={fmt(DEMO_SETUP.currentPrice)} meta="Demo price" tone="amber"/><Kpi label="WEEKLY" value="BEARISH" meta="Demo bias" tone="red"/><Kpi label="H1" value="SHIFT" meta="External bearish shift" tone="green"/><Kpi label="SESSION" value="LONDON" meta="Demo session"/></div><div className="grid gridMain spacedTop"><Card><MarketChart/></Card><Card className="pad"><div className="eyebrow">ACTIVE FIBONACCI</div><h2>Verified anchors required in live mode</h2><FibLevels/></Card></div></>; }
+function LiveMarket() { return <div className="os-content"><PageHeader eyebrow="MARKET CENTER" title="Live Market" description="A clean market cockpit for XAU/USD. Live values are only shown when the provider is configured and responding." action={<Badge tone="amber">DEMO FEED</Badge>}/><div className="os-grid os-grid-4"><Stat label="XAU / USD" value={fmt(DEMO_SETUP.currentPrice)} meta="Demo reference" tone="amber"/><Stat label="CHANGE" value="+0.42%" meta="Illustrative only" tone="green"/><Stat label="SESSION" value="LONDON" meta="Current session"/><Stat label="FEED" value="READY" meta="Provider state" tone="green"/></div><div className="os-grid os-main-grid"><Panel className="market-cockpit"><PanelTitle title="Market context" meta="Chart module below · live data adapter ready"/><div className="market-price"><span>XAU/USD</span><strong>{fmt(DEMO_SETUP.currentPrice)}</strong><Badge tone="amber">DEMO</Badge></div><div className="mini-bars">{Array.from({length:32},(_,i)=><i key={i} style={{height:`${18 + ((i*17)%62)}%`}}/>)}</div></Panel><Panel><PanelTitle title="Timeframe matrix" meta="System view"/>{[["W1","BEARISH"],["D1","BEARISH"],["H4","BEARISH"],["H1","SHIFT"],["M15","RETRACE"],["M5","REFINE"]].map(([tf,v])=><div className="matrix-row" key={tf}><b>{tf}</b><span>{v}</span><i className={v === "SHIFT" ? "green" : v === "RETRACE" ? "amber" : "coral"}/></div>)}</Panel></div></div>; }
 
-function PoiMonitor() { return <><SectionTitle title="POI Monitor" description="Track approach, entry, liquidity formation, sweep and invalidation." action={<Chip>STATE-CHANGE ALERTS</Chip>}/><div className="grid grid4"><Kpi label="POI" value={fmt(fibPrice(.71))} meta="0.71 Fibonacci" tone="amber"/><Kpi label="CURRENT" value={fmt(DEMO_SETUP.currentPrice)} meta="Demo price"/><Kpi label="STATE" value="INSIDE POI" meta="Demo condition" tone="amber"/><Kpi label="LIQUIDITY" value="PENDING" meta="Sweep required" tone="amber"/></div><div className="grid grid2 spacedTop"><Card className="pad"><div className="eyebrow">POI LEVELS</div><FibLevels/></Card><Card className="pad"><div className="eyebrow">ALERT LOGIC</div><h2>Notify only when state changes</h2><div className="alertFlow"><span>OUTSIDE</span><b>→</b><span>APPROACHING</span><b>→</b><span>INSIDE</span><b>→</b><span>LIQUIDITY</span><b>→</b><span>CONFIRMED</span></div><p className="subtle">Background monitoring belongs on the server so it can continue while this page is closed.</p></Card></div><SectionTitle title="Current setup state" description="Liquidity confirmation is required in the refined entry model."/><Card className="pad"><SetupTimeline/></Card></>; }
+function POIMonitor() { return <div className="os-content"><PageHeader eyebrow="EXECUTION RADAR" title="POI Monitor" description="Watch the 0.71 zone without turning every tick into a trade signal." action={<Badge tone="blue">STATE CHANGE ONLY</Badge>}/><div className="os-grid os-grid-4"><Stat label="PRIMARY POI" value={fmt(fibPrice(.71))} meta="0.71 Fibonacci" tone="amber"/><Stat label="PRICE" value={fmt(DEMO_SETUP.currentPrice)} meta="Demo reference"/><Stat label="DISTANCE" value="+0.00" meta="Illustrative" tone="amber"/><Stat label="LIQUIDITY" value="PENDING" meta="Sweep required" tone="amber"/></div><Panel><PanelTitle title="POI state machine" meta="Refined entry model"/><div className="state-machine">{["Outside","Approaching","Inside POI","Liquidity sweep","Confirmed"].map((x,i)=><div className={`machine ${i < 3 ? "done" : i === 3 ? "active" : ""}`} key={x}><span>{i+1}</span><b>{x}</b>{i < 4 && <Icon name="arrow" size={15}/>}</div>)}</div><div className="alert-note"><Icon name="shield" size={18}/><div><b>Alert principle</b><p>Only meaningful state transitions should notify you. Repeated internal sweeps do not justify emotional stop movement.</p></div></div></Panel></div>; }
 
-function Setups() {
-  const rows = [["XAUUSD","Bearish","Inside POI","Waiting liquidity","DEVELOPING"],["XAUUSD","Bullish","Invalidated","Structure failed","INVALID"],["XAUUSD","Bearish","TP2 hit","Complete","VALID"]];
-  return <><SectionTitle title="Setups" description="Audit developing, valid and invalid opportunities."/><Card className="pad"><div className="tableWrap"><table><thead><tr><th>Instrument</th><th>Direction</th><th>POI state</th><th>Condition</th><th>Status</th></tr></thead><tbody>{rows.map((r,i)=><tr key={i}>{r.slice(0,4).map((c,j)=><td key={j}>{c}</td>)}<td><Chip tone={r[4]==="VALID"?"green":r[4]==="INVALID"?"red":"amber"}>{r[4]}</Chip></td></tr>)}</tbody></table></div></Card></>;
-}
+function Setups() { const rows = [["XAU/USD","Bearish","Inside POI","Liquidity pending","DEVELOPING"],["XAU/USD","Bullish","Structure failed","Invalidated","INVALID"],["XAU/USD","Bearish","TP2 reached","Complete","VALID"]]; return <div className="os-content"><PageHeader eyebrow="SETUP BOOK" title="Setups" description="A ranked queue of strategy-defined opportunities — not a signal feed." action={<Badge tone="blue">3 SCENARIOS</Badge>}/><Panel><div className="setup-list">{rows.map((r,i)=><motion.div whileHover={{x:2}} className="setup-row" key={i}><div className="setup-symbol"><span>{i+1}</span><div><b>{r[0]}</b><small>{r[1]} · H1</small></div></div><div><small>CONTEXT</small><b>{r[2]}</b></div><div><small>CONDITION</small><b>{r[3]}</b></div><Badge tone={r[4] === "VALID" ? "green" : r[4] === "INVALID" ? "coral" : "amber"}>{r[4]}</Badge><Icon name="chevron" size={17}/></motion.div>)}</div></Panel><Panel><PanelTitle title="What qualifies" meta="The queue stays empty when conditions are unclear"/><div className="qualify-grid">{["HTF direction","Structure shift","Valid impulse","Fib anchor","POI return","Internal sweep"].map((x,i)=><div key={x}><span>{String(i+1).padStart(2,"0")}</span><b>{x}</b></div>)}</div></Panel></div>; }
 
-function Journal({ rows, setRows }: { rows: JournalRow[]; setRows: React.Dispatch<React.SetStateAction<JournalRow[]>> }) {
-  const [saved,setSaved] = useState(false);
-  function submit(e: FormEvent<HTMLFormElement>) { e.preventDefault(); setRows(r=>[{date:"Today",session:"London",bias:"Bearish",outcome:"Open",followed:true},...r]); setSaved(true); }
-  return <><SectionTitle title="Journal" description="Separate strategy performance from execution discipline." action={<Chip>LOCAL DEMO FORM</Chip>}/><div className="grid grid2"><Card className="pad"><div className="eyebrow">NEW JOURNAL ENTRY</div><h2>Document the process, not the story</h2><form className="formGrid" onSubmit={submit}><label className="field">Session<select><option>Asia</option><option>London</option><option>New York</option></select></label><label className="field">Bias<select><option>Bearish</option><option>Bullish</option><option>Neutral</option></select></label><label className="field">Entry<input defaultValue={fmt(fibPrice(.71))}/></label><label className="field">Stop<input defaultValue={fmt(fibPrice(.95))}/></label><label className="field full">Notes<textarea placeholder="What happened objectively?"/></label><label className="check full"><input type="checkbox"/>Did I follow my rules?</label><button className="btn primary" type="submit">Save demo entry</button>{saved?<span className="saveNote">Saved in local UI state. Connect Supabase for persistence.</span>:null}</form></Card><Card className="pad"><div className="eyebrow">RECENT ENTRIES</div><div className="tableWrap"><table><thead><tr><th>Date</th><th>Session</th><th>Bias</th><th>Outcome</th><th>Rules</th></tr></thead><tbody>{rows.map((r,i)=><tr key={`${r.date}-${i}`}><td>{r.date}</td><td>{r.session}</td><td>{r.bias}</td><td>{r.outcome}</td><td>{r.followed?<Chip tone="green">YES</Chip>:<Chip tone="red">NO</Chip>}</td></tr>)}</tbody></table></div></Card></div></>;
-}
+function Journal() { return <div className="os-content"><PageHeader eyebrow="PERFORMANCE" title="Trading Journal" description="Turn execution into data. Track whether the plan was followed before judging the result." action={<button className="os-button primary">+ New entry</button>}/><div className="os-grid os-grid-4"><Stat label="TRADES" value="24" meta="This month"/><Stat label="FOLLOWED PLAN" value="83%" meta="Execution quality" tone="green"/><Stat label="AVG R" value="+1.12R" meta="Closed trades" tone="green"/><Stat label="BEST SESSION" value="NY" meta="Highest expectancy"/></div><Panel><PanelTitle title="Recent journal" meta="Demo records · replace with persistent storage"/><div className="journal-table"><div className="journal-head"><span>Date</span><span>Session</span><span>Bias</span><span>Outcome</span><span>Plan</span></div>{[["Sep 10","New York","Bearish","+3.8R","Followed"],["Sep 09","London","Bearish","−1.0R","Broken"],["Sep 08","Asia","Bullish","+1.9R","Followed"],["Sep 07","London","Bearish","BE","Followed"]].map(r=><div className="journal-row" key={r[0]}>{r.map((x,i)=><span className={i===3&&x.includes("+")?"green":i===3&&x.includes("−")?"coral":""} key={x}>{x}</span>)}</div>)}</div></Panel></div>; }
 
-function Backtest() { return <><SectionTitle title="Backtest" description="Illustrative values only until a verified historical feed is connected." action={<Chip>DEMO METRICS</Chip>}/><Card className="pad"><div className="metricList">{backtestMetrics.map(([l,v])=><div className="metricBox" key={l}><span>{l}</span><strong>{v}</strong></div>)}</div></Card><div className="grid grid2 spacedTop"><Card className="pad"><div className="eyebrow">LIQUIDITY SWEEPS BEFORE REVERSAL</div><h2>How often does price keep taking liquidity?</h2><div className="bars">{sweepStats.map(s=><div className="barCol" key={s.label}><div className="barValue">{s.value}%</div><div className="bar" style={{height:`${s.value*2.3}px`}}/><div className="barLabel">{s.label}</div></div>)}</div></Card><Card className="pad"><div className="eyebrow">BACKTEST WINDOWS</div><h2>Prepared for historical provider</h2><div className="buttonGrid">{["1 month","3 months","1 year","3 years","5 years"].map(v=><button className="btn" key={v}>{v}</button>)}</div><p className="subtle">Never treat demo metrics as measured performance.</p></Card></div></>; }
+function Backtest() { return <div className="os-content"><PageHeader eyebrow="RESEARCH ENGINE" title="Backtest" description="Measure the rules before trusting the rules. No optimization theater." action={<Badge tone="blue">146 SETUPS</Badge>}/><div className="os-grid os-grid-4">{[["WIN RATE","38.4%"],["AVG R","+1.12R"],["EXPECTANCY","+0.43R"],["PROFIT FACTOR","1.56"]].map(([a,b],i)=><Stat key={a} label={a} value={b} meta="Historical demo sample" tone={i>0?"green":""}/>)}</div><div className="os-grid os-main-grid"><Panel><PanelTitle title="Equity profile" meta="Illustrative backtest curve"/><div className="equity-chart"><svg viewBox="0 0 720 220" preserveAspectRatio="none"><path d="M0 184 C70 172 90 180 140 145 S215 154 270 116 S350 126 405 93 S490 110 545 66 S620 82 720 28"/><line x1="0" x2="720" y1="184" y2="184"/></svg></div></Panel><Panel><PanelTitle title="Risk profile"/><div className="risk-profile">{[["Max drawdown","−8.4R"],["TP1 hit rate","57.5%"],["TP2 hit rate","34.2%"],["Sample size","146"]].map(x=><div className="risk-row" key={x[0]}><span>{x[0]}</span><b>{x[1]}</b></div>)}</div></Panel></div></div>; }
 
-function StrategyLab() {
-  const [entry,setEntry]=useState("0.71"), [stop,setStop]=useState("0.95"), [tp,setTp]=useState("-0.21");
-  return <><SectionTitle title="Strategy Lab" description="Experiment without changing the locked production framework." action={<Chip tone="blue">TEST ONLY</Chip>}/><div className="grid grid2"><Card className="pad"><div className="eyebrow">PRODUCTION SYSTEM • LOCKED</div><div className="ruleLock">{[["Entry / POI","0.71"],["Stop","0.95"],["TP1","0.00"],["TP2","−0.21"]].map(([l,v])=><div className="lockItem" key={l}><span>{l}</span><strong>{v}</strong></div>)}</div></Card><Card className="pad"><div className="eyebrow">EXPERIMENT</div><div className="formGrid"><label className="field">Entry<select value={entry} onChange={e=>setEntry(e.target.value)}>{["0.618","0.705","0.71","0.786"].map(v=><option key={v}>{v}</option>)}</select></label><label className="field">Stop<select value={stop} onChange={e=>setStop(e.target.value)}>{["0.90","0.95","1.00"].map(v=><option key={v}>{v}</option>)}</select></label><label className="field">TP2<select value={tp} onChange={e=>setTp(e.target.value)}>{["0","-0.21","-0.27"].map(v=><option key={v}>{v}</option>)}</select></label></div><div className="experimentSummary">Testing {entry} / {stop} / 0 / {tp}</div></Card></div></>;
-}
+function StrategyLab() { return <div className="os-content"><PageHeader eyebrow="RULES ENGINE" title="Strategy Lab" description="Your canonical model, expressed as inspectable rules rather than intuition."/><div className="os-grid os-grid-3">{[["01","Macro","Weekly + Daily define direction and key liquidity."],["02","Structure","H4/H1 shift must occur before the Fibonacci setup."],["03","Execution","Return to 0.71, then wait for internal liquidity."]].map(x=><Panel key={x[1]}><span className="lab-num">{x[0]}</span><h3>{x[1]}</h3><p>{x[2]}</p></Panel>)}</div><Panel><PanelTitle title="Canonical Fibonacci model" meta="Fixed until a tested rule change is approved"/><div className="fib-grid">{[["0.95","SL"],["0.71","PRIMARY POI"],["0.00","TP1"],["−0.21","TP2"]].map(x=><div key={x[0]}><b>{x[0]}</b><span>{x[1]}</span></div>)}</div></Panel></div>; }
 
-function Analytics() { return <><SectionTitle title="Analytics" description="Understand strategy edge, sessions, execution and rule adherence."/><div className="grid grid3"><Card className="pad"><div className="eyebrow">RULE ADHERENCE</div><div className="bigMetric">78%</div><p>Demo: trades where predefined rules were followed.</p></Card><Card className="pad"><div className="eyebrow">LOSSES AFTER VIOLATIONS</div><div className="bigMetric redText">67%</div><p>Demo statistic only.</p></Card><Card className="pad"><div className="eyebrow">BEST SESSION</div><div className="bigMetric">LONDON</div><p>Demo session analysis.</p></Card></div><div className="grid grid2 spacedTop"><Card className="pad"><div className="eyebrow">STRATEGY FAILURE VS EXECUTION FAILURE</div><h2>Keep the two separate</h2><p>Backtesting should measure the rules exactly as written. Journal analytics should measure whether you followed those rules. Do not change the strategy because of an execution mistake.</p></Card><Card className="pad"><div className="eyebrow">WEEKLY REVIEW</div><h2>Reflect → Adjust → Improve</h2><p>Use a statistically meaningful sample before modifying the canonical 0.71 / 0.95 / 0 / −0.21 framework.</p></Card></div></>; }
+function Analytics() { return <div className="os-content"><PageHeader eyebrow="INTELLIGENCE" title="Analytics" description="A calm view of what is working, where the process leaks, and what deserves review."/><div className="os-grid os-grid-4"><Stat label="EXPECTANCY" value="+0.43R" meta="Per setup" tone="green"/><Stat label="PLAN ADHERENCE" value="83%" meta="Execution" tone="green"/><Stat label="LIQUIDITY SWEEP" value="61%" meta="Qualified setups"/><Stat label="REVENGE TRADES" value="3" meta="Needs attention" tone="coral"/></div><Panel><PanelTitle title="Process score" meta="Demo analytics"/><div className="process-score">{[["HTF alignment",92],["Structure confirmation",84],["POI discipline",88],["Liquidity patience",63],["Risk discipline",79]].map(x=><div key={x[0]}><div><span>{x[0]}</span><b>{x[1]}</b></div><div className="score-bar"><i style={{width:`${x[1]}%`}}/></div></div>)}</div></Panel></div>; }
 
-function Psychology() { const [selected,setSelected]=useState("Calm"); return <><SectionTitle title="Psychology" description="Capture state before execution so emotion can be measured instead of guessed."/><Card className="pad"><div className="eyebrow">HOW ARE YOU FEELING?</div><div className="moodGrid">{moods.map(m=><button key={m} className={`mood ${selected===m?"selected":""}`} onClick={()=>setSelected(m)}>{m}</button>)}</div><div className="psychResult">Current state: <strong>{selected}</strong></div></Card><div className="grid grid3 spacedTop"><Card className="pad"><div className="eyebrow">MOST COMMON VIOLATION</div><div className="bigMetric">Moved SL</div></Card><Card className="pad"><div className="eyebrow">BEST STATE</div><div className="bigMetric">Calm</div></Card><Card className="pad"><div className="eyebrow">WEEKLY FOCUS</div><div className="bigMetric">Wait</div></Card></div></>; }
+function Psychology() { return <div className="os-content"><PageHeader eyebrow="PERFORMANCE MINDSET" title="Psychology" description="Protect the process from urgency, FOMO and revenge trading."/><div className="os-grid os-grid-3">{[["Before entry","Am I inside the defined conditions?"],["During trade","Can I leave the stop and targets untouched?"],["After trade","Did I follow the system regardless of outcome?"]].map(x=><Panel key={x[0]}><span className="os-eyebrow">CHECK {x[0].toUpperCase()}</span><h3>{x[1]}</h3><div className="mood-line"><span>Calm</span><span>Focused</span><span>Patient</span></div></Panel>)}</div><Panel className="quote-panel"><Icon name="shield" size={26}/><h3>“No setup is a position.”</h3><p>The highest-quality trade can be the one you correctly refused.</p></Panel></div>; }
 
-function Calendar() { return <><SectionTitle title="Economic Calendar" description="Surface high-impact USD risk without turning news into a trade signal." action={<Chip>DEMO EVENTS</Chip>}/><Card className="pad">{economicEvents.map(e=><div className="calendarEvent" key={e.time+e.name}><div className="eventTime">{e.time}</div><Chip tone={e.impact==="High"?"red":"amber"}>{e.impact}</Chip><div><div className="eventName">{e.name}</div><div className="eventMeta">{e.meta}</div></div></div>)}</Card></>; }
+function EconomicCalendar() { return <div className="os-content"><PageHeader eyebrow="MACRO WATCH" title="Economic Calendar" description="Macro events are context. They do not override your structure and execution rules." action={<Badge tone="amber">DEMO EVENTS</Badge>}/><Panel><div className="event-list">{[["12:30","HIGH","US CPI","Inflation data"],["14:00","HIGH","Fed Chair remarks","Policy commentary"],["15:30","MEDIUM","US crude inventories","Energy data"]].map(x=><div className="event-row" key={x[2]}><b>{x[0]}</b><Badge tone={x[1]==="HIGH"?"coral":"amber"}>{x[1]}</Badge><div><strong>{x[2]}</strong><small>{x[3]}</small></div><span>Today</span></div>)}</div></Panel></div>; }
 
-function Assistant() {
-  const suggestions = ["Where is XAUUSD relative to my POI?","Has liquidity been taken?","Is this swing valid?","Did I break my rules yesterday?"];
-  const [messages,setMessages]=useState<ChatMessage[]>([{role:"ai",text:"Ask me about your strategy. I will distinguish confirmed, developing, invalid and unknown conditions."}]); const [input,setInput]=useState("");
-  function send(q:string){ if(!q.trim()) return; const l=q.toLowerCase(); let response: ChatMessage; if(l.includes("liquidity")) response={role:"ai",status:"DEVELOPING",text:"Demo state: price is inside the 0.71 POI, but the required internal liquidity sweep is still pending."}; else if(l.includes("swing")) response={role:"ai",status:"CONFIRMED",text:"The demo swing is tagged as the impulse leg that caused the external H1 shift. Live mode must verify this from closed-candle structure."}; else if(l.includes("rules")) response={role:"ai",status:"UNKNOWN",text:"Persistent journal data is not connected yet, so I cannot honestly determine yesterday’s rule adherence."}; else response={role:"ai",status:"DEVELOPING",text:"In demo mode XAUUSD is at the POI stage and is still waiting for liquidity confirmation."}; setMessages(m=>[...m,{role:"user",text:q},response]); setInput(""); }
-  return <><SectionTitle title="AI Assistant" description="Strategy-aware analysis that must never fabricate market state." action={<Chip>DEMO LOGIC</Chip>}/><Card className="assistantShell"><aside className="assistantSide"><div className="eyebrow">SUGGESTED</div><div className="suggested">{suggestions.map(s=><button className="btn ghost" onClick={()=>send(s)} key={s}>{s}</button>)}</div></aside><div className="assistantMain"><div className="chatLog">{messages.map((m,i)=><div className={`msg ${m.role}`} key={i}>{m.status?<Chip tone={m.status==="CONFIRMED"?"green":m.status==="INVALID"?"red":m.status==="UNKNOWN"?"blue":"amber"}>{m.status}</Chip>:null}<p>{m.text}</p></div>)}</div><form className="chatInput" onSubmit={e=>{e.preventDefault();send(input)}}><input value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask about your setup..."/><button className="btn primary">Send</button></form></div></Card></>;
-}
+function AIAssistant() { return <div className="os-content"><PageHeader eyebrow="DECISION SUPPORT" title="AI Assistant" description="AI explains verified system context. It should never invent a setup or override the deterministic rules." action={<Badge tone="blue">CONTEXT FIRST</Badge>}/><Panel className="ai-hero"><div className="ai-orb"><Icon name="spark" size={28}/></div><div><span className="os-eyebrow">POI TRADER INTELLIGENCE</span><h3>Ask about the current setup</h3><p>The assistant can summarize market state, explain why the setup is developing, and identify which predefined condition is still missing.</p><button className="os-button primary">Open assistant</button></div></Panel><div className="prompt-grid">{["Why is this setup not confirmed?","What condition comes next?","Explain the 0.71 POI rule","Summarize today's risk plan"].map(x=><button key={x}>{x}<Icon name="arrow" size={15}/></button>)}</div></div>; }
 
-function Settings() { const integrations=[["Realtime XAUUSD feed","Not connected"],["Historical data","Not connected"],["Supabase persistence","Ready to configure"],["Economic calendar","Demo only"],["Browser push","UI ready"],["Telegram","Placeholder"],["Email alerts","Placeholder"]]; return <><SectionTitle title="Settings" description="Production integrations and safety controls." action={<Chip tone="blue">NO BROKER EXECUTION</Chip>}/><div className="grid grid2"><Card className="pad"><div className="eyebrow">INTEGRATIONS</div>{integrations.map(([a,b])=><div className="switchRow" key={a}><div><strong>{a}</strong><span>{b}</span></div><button className="btn ghost">Configure</button></div>)}</Card><Card className="pad"><div className="eyebrow">SAFETY</div><h2>Analysis and discipline only</h2><p>No broker auto-execution or real-money movement is included. API secrets belong on the server. Keep live mode disabled until the feed and symbol specifications are verified.</p><div className="callout">NEXT_PUBLIC_DEMO_MODE=true</div></Card></div></>; }
+function Settings() { return <div className="os-content"><PageHeader eyebrow="SYSTEM CONTROL" title="Settings" description="Configure presentation and data behavior without changing the trading rules silently."/><div className="os-grid os-grid-2"><Panel><PanelTitle title="Market data" meta="Server-side credentials only"/><div className="setting-row"><div><b>Provider</b><small>Twelve Data</small></div><Badge tone="amber">KEY REQUIRED</Badge></div><div className="setting-row"><div><b>Symbol</b><small>XAU/USD</small></div><Badge tone="blue">ACTIVE</Badge></div><div className="setting-row"><div><b>Polling</b><small>30 second dashboard refresh</small></div><Badge>READY</Badge></div></Panel><Panel><PanelTitle title="Strategy protection" meta="These rules remain canonical"/><div className="setting-row"><div><b>Primary POI</b><small>0.71</small></div><strong>LOCKED</strong></div><div className="setting-row"><div><b>Stop reference</b><small>0.95</small></div><strong>LOCKED</strong></div><div className="setting-row"><div><b>Targets</b><small>0.00 / −0.21</small></div><strong>LOCKED</strong></div></Panel></div><Panel><PanelTitle title="Interface" meta="Premium light workspace"/><div className="interface-grid"><button className="selected">Light interface <span>●</span></button><button>Compact density <span>○</span></button><button>Reduce motion <span>○</span></button></div></Panel></div>; }
 
-function Screen({ tab, rows, setRows }: { tab: Tab; rows: JournalRow[]; setRows: React.Dispatch<React.SetStateAction<JournalRow[]>> }) {
-  if(tab==="Overview") return <Overview/>;
-  if(tab==="Live Market") return <LiveMarket/>;
-  if(tab==="POI Monitor") return <PoiMonitor/>;
-  if(tab==="Setups") return <Setups/>;
-  if(tab==="Journal") return <Journal rows={rows} setRows={setRows}/>;
-  if(tab==="Backtest") return <Backtest/>;
-  if(tab==="Strategy Lab") return <StrategyLab/>;
-  if(tab==="Analytics") return <Analytics/>;
-  if(tab==="Psychology") return <Psychology/>;
-  if(tab==="Economic Calendar") return <Calendar/>;
-  if(tab==="AI Assistant") return <Assistant/>;
-  return <Settings/>;
-}
+const views: Record<Tab, () => React.ReactNode> = { Overview, "Live Market": LiveMarket, "POI Monitor": POIMonitor, Setups, Journal, Backtest, "Strategy Lab": StrategyLab, Analytics, Psychology, "Economic Calendar": EconomicCalendar, "AI Assistant": AIAssistant, Settings };
 
 export default function TradingOS() {
-  const [tab,setTab]=useState<Tab>("Overview");
-  const [rows,setRows]=useState(initialJournal);
-  const mobileTabs = new Set<Tab>(["Overview","Live Market","POI Monitor","Journal","AI Assistant"]);
-  return <div className="appShell"><aside className="sidebar"><div className="brand"><span className="brandMark">P</span><div><div className="brandName">POI Trader OS</div><div className="brandSub">XAUUSD discipline system</div></div></div><nav className="nav">{tabs.map(t=><button key={t.label} className={`navBtn ${tab===t.label?"active":""}`} onClick={()=>setTab(t.label)}><span className="navIcon">{t.icon}</span><span>{t.label}</span></button>)}</nav><div className="sidebarFooter"><div className="miniCard"><div className="miniLabel">Canonical system</div><div className="miniValue">0.71 / 0.95 / 0 / −0.21</div><div className="miniCopy">Locked production rules</div></div><div className="copyright">Reflect → Adjust → Improve</div></div></aside><div className="mainWrap"><header className="topbar"><div><div className="eyebrow">DISCIPLINED EXECUTION</div><h1>{tab}</h1></div><div className="topbarActions"><span className="pill demoPill">DEMO DATA</span><span className="pill marketOpen"><span className="dot dot-green"/> MARKET OPEN</span><button className="iconBtn" aria-label="Notifications">🔔<span className="badgeCount">3</span></button></div></header><main className="content"><Screen tab={tab} rows={rows} setRows={setRows}/></main><footer className="siteFooter">Built for disciplined execution — Reflect → Adjust → Improve.</footer></div><nav className="mobileNav">{tabs.filter(t=>mobileTabs.has(t.label)).map(t=><button key={t.label} className={`mobileNavBtn ${tab===t.label?"active":""}`} onClick={()=>setTab(t.label)}><span>{t.icon}</span><small>{t.label}</small></button>)}</nav></div>;
+  const [active, setActive] = useState<Tab>("Overview");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const Current = useMemo(() => views[active], [active]);
+  return <div className="os-shell">
+    <header className="os-header">
+      <div className="os-brand"><div className="brand-mark"><span>POI</span></div><div><b>Trader OS</b><small>XAU/USD · SYSTEM</small></div></div>
+      <div className="os-symbol"><span className="live-dot"/> XAU/USD <b>{fmt(DEMO_SETUP.currentPrice)}</b><Badge tone="amber">DEMO</Badge></div>
+      <div className="os-header-actions"><button aria-label="Search" className="icon-button"><Icon name="search"/></button><button aria-label="Settings" className="icon-button" onClick={()=>setActive("Settings")}><Icon name="gear"/></button><div className="avatar">M</div><button className="mobile-menu icon-button" onClick={()=>setMobileOpen(v=>!v)}><Icon name="menu"/></button></div>
+    </header>
+    <aside className={`os-sidebar ${mobileOpen ? "open" : ""}`}><div className="sidebar-top"><span>WORKSPACE</span><button onClick={()=>setMobileOpen(false)} className="mobile-close">×</button></div>{["Workspace","Performance","Research","Tools"].map(group=><div className="nav-group" key={group}><span className="nav-label">{group}</span>{tabs.filter(t=>t.group===group).map(item=><button key={item.label} className={active===item.label?"active":""} onClick={()=>{setActive(item.label);setMobileOpen(false)}}><Icon name={item.icon}/><span>{item.label}</span>{active===item.label&&<i/>}</button>)}</div>)}</aside>
+    <main className="os-main"><AnimatePresence mode="wait"><motion.div key={active} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-4}} transition={{duration:.18}}><Current/></motion.div></AnimatePresence></main>
+    <nav className="os-mobile-nav">{tabs.slice(0,4).map(item=><button key={item.label} className={active===item.label?"active":""} onClick={()=>setActive(item.label)}><Icon name={item.icon} size={17}/><span>{item.label.replace(" Monitor","")}</span></button>)}</nav>
+  </div>;
 }
