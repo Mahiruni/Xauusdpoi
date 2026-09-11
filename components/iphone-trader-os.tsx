@@ -1,0 +1,67 @@
+"use client";
+
+import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { DEMO_SETUP, SETUP_STAGES, STRATEGY, fibPrice, fmt, setupReason, setupState } from "@/lib/strategy";
+import "./iphone-trader-os.css";
+
+type View = "Home" | "Market" | "POI" | "Setups" | "Journal" | "Performance" | "Backtest" | "Strategy" | "Calendar" | "AI Copilot" | "Psychology" | "Settings";
+
+const primary: { id: View; icon: string }[] = [
+  { id: "Home", icon: "⌂" }, { id: "Market", icon: "⌁" }, { id: "POI", icon: "◎" }, { id: "Setups", icon: "▣" }, { id: "Journal", icon: "□" },
+];
+const more: { id: View; icon: string; desc: string }[] = [
+  { id: "Performance", icon: "↗", desc: "Edge, risk and execution" },
+  { id: "Backtest", icon: "↻", desc: "Test the rules" },
+  { id: "Strategy", icon: "✦", desc: "POI methodology" },
+  { id: "Calendar", icon: "□", desc: "Macro events" },
+  { id: "AI Copilot", icon: "✧", desc: "Explain verified context" },
+  { id: "Psychology", icon: "◌", desc: "Process and discipline" },
+  { id: "Settings", icon: "⚙", desc: "System preferences" },
+];
+
+function Pill({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "green" | "amber" | "coral" | "blue" }) {
+  return <span className={`ip-pill ${tone}`}>{children}</span>;
+}
+
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <section className={`ip-card ${className}`}>{children}</section>;
+}
+
+function Row({ label, value, note, tone = "" }: { label: string; value: string; note?: string; tone?: string }) {
+  return <div className="ip-row"><div><span>{label}</span>{note && <small>{note}</small>}</div><strong className={tone}>{value}</strong></div>;
+}
+
+function Home({ go }: { go: (v: View) => void }) {
+  const state = setupState();
+  const current = DEMO_SETUP.stateIndex;
+  return <div className="ip-page">
+    <div className="ip-greeting"><div><span>TRADER OS</span><h1>Good evening, Mahir.</h1><p>Your system is watching XAU/USD.</p></div><div className="ip-avatar">M</div></div>
+    <Card className="ip-hero-card"><div className="ip-hero-top"><div><Pill tone="amber">DEMO MODE</Pill><span className="ip-live"><i/> XAU/USD</span></div><span className="ip-time">M15 EXECUTION</span></div><div className="ip-hero-price"><strong>{fmt(DEMO_SETUP.currentPrice)}</strong><span>USD</span></div><div className="ip-hero-state"><div><small>SETUP STATE</small><b>{state}</b><p>{setupReason()}</p></div><button onClick={() => go("POI")}>Open POI <span>›</span></button></div></Card>
+    <div className="ip-section-head"><h2>System status</h2><button onClick={() => go("Strategy")}>Rules ›</button></div>
+    <div className="ip-grid-2"><Card><small className="ip-label">WEEKLY / DAILY</small><div className="ip-big coral">BEARISH</div><p>Higher-timeframe alignment</p></Card><Card><small className="ip-label">H1 STRUCTURE</small><div className="ip-big green">SHIFT</div><p>External shift confirmed</p></Card></div>
+    <Card><div className="ip-card-head"><div><h3>Setup progression</h3><p>{current + 1} of {SETUP_STAGES.length} conditions</p></div><Pill tone="blue">0.71 POI</Pill></div><div className="ip-progress"><span style={{ width: `${((current + 1) / SETUP_STAGES.length) * 100}%` }}/></div><div className="ip-stage-line"><b>{SETUP_STAGES[current]}</b><span>Waiting for next condition</span></div></Card>
+    <div className="ip-section-head"><h2>Mechanical levels</h2><button onClick={() => go("POI")}>View ›</button></div>
+    <Card><Row label="Primary POI" note="Fib 0.71" value={fmt(fibPrice(.71))} tone="blue"/><Row label="Stop" note="Fib 0.95" value={fmt(fibPrice(.95))} tone="coral"/><Row label="Target 1" note="Fib 0.00" value={fmt(fibPrice(0))} tone="green"/><Row label="Target 2" note="Fib −0.21" value={fmt(fibPrice(-.21))} tone="green"/></Card>
+  </div>;
+}
+
+function Market({ go }: { go: (v: View) => void }) { return <div className="ip-page"><PageTitle eyebrow="MARKET" title="XAU/USD" sub="Clean context. No invented live data."/><Card className="ip-market-card"><div className="ip-market-top"><Pill tone="amber">DEMO FEED</Pill><span>Provider required for live price</span></div><strong>{fmt(DEMO_SETUP.currentPrice)}</strong><div className="ip-wave">{Array.from({length:28},(_,i)=><i key={i} style={{height:`${20+((i*19)%65)}%`}}/>)}</div><button className="ip-primary" onClick={() => go("POI")}>Open execution radar <span>›</span></button></Card><div className="ip-section-head"><h2>Timeframe context</h2></div><Card><Row label="Weekly" value="BEARISH" tone="coral"/><Row label="Daily" value="BEARISH" tone="coral"/><Row label="H4" value="BEARISH" tone="coral"/><Row label="H1" value="SHIFT" tone="green"/><Row label="M15" value="RETRACE" tone="blue"/><Row label="M5" value="REFINE" tone="amber"/></Card></div>; }
+
+function POI() { const state = setupState(); return <div className="ip-page"><PageTitle eyebrow="EXECUTION RADAR" title="POI Monitor" sub="The system does not enter until liquidity is swept inside the POI."/><Card className="ip-poi-card"><div className="ip-poi-badge"><Pill tone="coral">BEARISH SETUP</Pill><span>XAU/USD · M15</span></div><strong>{fmt(fibPrice(.71))}</strong><span className="ip-poi-label">PRIMARY POI · 0.71</span><div className="ip-condition"><span className="ip-pulse"/> {state === "VALID" ? "READY" : "WAITING FOR LIQUIDITY"}</div></Card><Card><div className="ip-card-head"><div><h3>Entry checklist</h3><p>Mechanical sequence</p></div></div>{["HTF bias","Structure shift","Valid impulse","Fib 0.71","Liquidity sweep","Entry"].map((x,i)=><div className="ip-check" key={x}><span className={i < 4 ? "done" : i === 4 ? "next" : "locked"}>{i < 4 ? "✓" : i === 4 ? "•" : "—"}</span><div><b>{x}</b><small>{i < 4 ? "Confirmed" : i === 4 ? "Required next" : "Locked"}</small></div></div>)}</Card><Card><Row label="Stop loss" value={fmt(fibPrice(.95))} tone="coral"/><Row label="Take profit 1" value={fmt(fibPrice(0))} tone="green"/><Row label="Take profit 2" value={fmt(fibPrice(-.21))} tone="green"/></Card></div>; }
+
+function Setups({ go }: { go: (v: View) => void }) { return <div className="ip-page"><PageTitle eyebrow="SETUPS" title="Setup queue" sub="Only rule-compliant opportunities belong here."/><Card><div className="ip-setup-feature"><Pill tone="amber">DEVELOPING</Pill><h3>XAU/USD · Bearish</h3><p>Retracing toward the 0.71 POI. Liquidity sweep not confirmed.</p><button onClick={() => go("POI")}>Inspect setup <span>›</span></button></div></Card><Card><Row label="Weekly bias" value="BEARISH" tone="coral"/><Row label="Daily bias" value="BEARISH" tone="coral"/><Row label="External shift" value="CONFIRMED" tone="green"/><Row label="Liquidity" value="WAITING" tone="amber"/></Card></div>; }
+
+function Journal() { return <div className="ip-page"><PageTitle eyebrow="JOURNAL" title="Your process" sub="Log the decision, not just the outcome."/><Card className="ip-empty"><div>＋</div><h3>No trades logged</h3><p>When a setup is executed, capture the reason, risk, and outcome here.</p><button className="ip-primary">New journal entry</button></Card><div className="ip-grid-2"><Card><small className="ip-label">DISCIPLINE</small><div className="ip-big">—</div><p>No sample yet</p></Card><Card><small className="ip-label">EXPECTANCY</small><div className="ip-big">—</div><p>Needs journal data</p></Card></div></div>; }
+
+function Secondary({ view }: { view: View }) { const data: Record<string,[string,string,string]> = { Performance:["Performance","Measure execution quality, risk and consistency.","Analytics will use journal data."],Backtest:["Backtest","Test the exact 0.71 / 0.95 / 0 / −0.21 rules.","No results are fabricated."],Strategy:["Strategy","POI methodology","Weekly/Daily bias → structure shift → valid impulse → 0.71 POI → internal liquidity sweep → entry."],Calendar:["Calendar","Macro context","Connect an economic calendar provider to show verified events."],"AI Copilot":["AI Copilot","Verified context only","The copilot should explain deterministic analysis, never invent market conditions."],Psychology:["Psychology","Protect the process","No clear condition means no trade. Do not move the stop emotionally."],Settings:["Settings","System controls","Market data, AI provider, notifications and appearance belong here."]}; const [title,sub,body]=data[view] ?? data.Performance; return <div className="ip-page"><PageTitle eyebrow="MORE" title={title} sub={sub}/><Card className="ip-feature-copy"><Pill tone="blue">SYSTEM</Pill><h3>{title}</h3><p>{body}</p><div className="ip-note">This module is intentionally honest about unavailable data. Connect the appropriate provider before calling it live.</div></Card></div>; }
+
+function PageTitle({ eyebrow, title, sub }: { eyebrow: string; title: string; sub: string }) { return <div className="ip-page-title"><span>{eyebrow}</span><h1>{title}</h1><p>{sub}</p></div>; }
+
+export default function IphoneTraderOS() {
+  const [active, setActive] = useState<View>("Home");
+  const [moreOpen, setMoreOpen] = useState(false);
+  const go = (view: View) => { setActive(view); setMoreOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const content = active === "Home" ? <Home go={go}/> : active === "Market" ? <Market go={go}/> : active === "POI" ? <POI/> : active === "Setups" ? <Setups go={go}/> : active === "Journal" ? <Journal/> : <Secondary view={active}/>;
+  return <main className="iphone-os"><header className="ip-header"><button className="ip-brand" onClick={() => go("Home")}><span>POI</span><b>Trader OS</b></button><div className="ip-symbol"><i/> XAU/USD <small>DEMO</small></div><button className="ip-more-top" aria-label="Open menu" onClick={() => setMoreOpen(true)}>•••</button></header><div className="ip-content">{content}</div><nav className="ip-tabbar">{primary.map(item => <button key={item.id} className={active === item.id ? "active" : ""} onClick={() => go(item.id)}><span>{item.icon}</span><b>{item.id}</b></button>)}<button className={moreOpen || !primary.some(x => x.id === active) ? "active" : ""} onClick={() => setMoreOpen(true)}><span>•••</span><b>More</b></button></nav><AnimatePresence>{moreOpen && <><motion.button className="ip-sheet-backdrop" aria-label="Close menu" onClick={() => setMoreOpen(false)} initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}/><motion.aside className="ip-sheet" initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}} transition={{type:"spring",stiffness:420,damping:34}}><div className="ip-sheet-grabber"/><div className="ip-sheet-head"><div><span>TRADER OS</span><h2>More</h2></div><button onClick={() => setMoreOpen(false)}>Done</button></div><div className="ip-more-list">{more.map(item => <button key={item.id} onClick={() => go(item.id)}><span className="ip-more-icon">{item.icon}</span><div><b>{item.id}</b><small>{item.desc}</small></div><em>›</em></button>)}</div></motion.aside></>}</AnimatePresence></main>;
+}
