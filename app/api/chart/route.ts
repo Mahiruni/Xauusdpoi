@@ -9,6 +9,12 @@ const MAX_CANDLES = 5000;
 
 type Quote = { price?: string; message?: string };
 
+function parseTimestamp(value: string) {
+  const normalized = value.trim().replace(" ", "T");
+  const timestamp = Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/.test(normalized) ? normalized : `${normalized}Z`) / 1000;
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
 export async function GET(request: NextRequest) {
   const apiKey = process.env.TWELVE_DATA_API_KEY || process.env.MARKET_DATA_API_KEY;
   const symbol = request.nextUrl.searchParams.get("symbol") || "XAU/USD";
@@ -28,10 +34,17 @@ export async function GET(request: NextRequest) {
     const payload = await response.json();
     const quotePayload = await quoteResponse.json() as Quote;
     if (!response.ok || payload.status === "error") return NextResponse.json({ ok: false, configured: true, candles: [], message: payload.message || "Market data provider error." }, { status: 502, headers: { "Cache-Control": "no-store" } });
-    const candles = (payload.values ?? []).map((row: { datetime: string; open: string; high: string; low: string; close: string }, index: number) => {
-      const timestamp = Date.parse(row.datetime.includes("T") ? row.datetime : `${row.datetime}T00:00:00Z`) / 1000;
-      return { time: Number.isFinite(timestamp) ? timestamp : index, open: Number(row.open), high: Number(row.high), low: Number(row.low), close: Number(row.close) };
-    }).filter((candle: { time: number; open: number; high: number; low: number; close: number }) => [candle.time, candle.open, candle.high, candle.low, candle.close].every(Number.isFinite)).reverse();
+
+    const candles = (payload.values ?? [])
+      .map((row: { datetime: string; open: string; high: string; low: string; close: string }) => ({
+        time: parseTimestamp(row.datetime),
+        open: Number(row.open), high: Number(row.high), low: Number(row.low), close: Number(row.close),
+      }))
+      .filter((candle: { time: number | null; open: number; high: number; low: number; close: number }): candle is { time: number; open: number; high: number; low: number; close: number } =>
+        candle.time != null && [candle.open, candle.high, candle.low, candle.close].every(Number.isFinite)
+      )
+      .sort((a: { time: number }, b: { time: number }) => a.time - b.time)
+      .filter((candle: { time: number }, index: number, all: { time: number }[]) => index === 0 || candle.time > all[index - 1].time);
 
     const exactQuote = Number(quotePayload.price);
     if (Number.isFinite(exactQuote) && candles.length && symbol.toUpperCase().replace(/\s/g, "") === "XAU/USD") {
