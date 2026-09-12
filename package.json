@@ -1,6 +1,6 @@
 {
   "name": "xauusd-poi-trader-os",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "engines": { "node": ">=20.9.0" },
   "scripts": {
@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "framer-motion": "12.23.24",
+    "motion-dom": "12.23.24",
     "lightweight-charts": "4.2.3",
     "next": "15.5.24",
     "react": "19.1.0",
