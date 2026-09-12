@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createChart, ColorType, CandlestickSeries, type IChartApi, type ISeriesApi, type CandlestickData, type Time } from "lightweight-charts";
+import { createChart, ColorType, type IChartApi, type ISeriesApi, type CandlestickData, type Time } from "lightweight-charts";
 
 type Candle = { time: number; open: number; high: number; low: number; close: number };
-
 type Props = { symbol?: string; timeframe?: string; height?: number };
 
 function formatPrice(value: number) { return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -29,7 +28,7 @@ export default function LiveFinancialChart({ symbol = "XAU/USD", timeframe = "15
       timeScale: { borderColor: "rgba(255,255,255,.08)", timeVisible: true, secondsVisible: false },
       crosshair: { vertLine: { color: "rgba(99,133,255,.7)" }, horzLine: { color: "rgba(99,133,255,.7)" } },
     });
-    const series = chart.addSeries(CandlestickSeries, { upColor: "#26a69a", downColor: "#ef5350", borderUpColor: "#26a69a", borderDownColor: "#ef5350", wickUpColor: "#26a69a", wickDownColor: "#ef5350", lastValueVisible: true, priceLineVisible: true });
+    const series = chart.addCandlestickSeries({ upColor: "#26a69a", downColor: "#ef5350", borderUpColor: "#26a69a", borderDownColor: "#ef5350", wickUpColor: "#26a69a", wickDownColor: "#ef5350", lastValueVisible: true, priceLineVisible: true });
     chartRef.current = chart; seriesRef.current = series;
     const resize = () => chart.applyOptions({ width: root.clientWidth, height });
     const observer = new ResizeObserver(resize); observer.observe(root);
@@ -40,17 +39,29 @@ export default function LiveFinancialChart({ symbol = "XAU/USD", timeframe = "15
     let cancelled = false;
     const load = async () => {
       try {
-        const [chartResponse, marketResponse] = await Promise.all([fetch(`/api/chart?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}&limit=1500`, { cache: "no-store" }), fetch("/api/market", { cache: "no-store" })]);
+        const [chartResponse, marketResponse] = await Promise.all([
+          fetch(`/api/chart?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}&limit=1500`, { cache: "no-store" }),
+          fetch("/api/market", { cache: "no-store" }),
+        ]);
         const chartPayload = await chartResponse.json();
         const marketPayload = await marketResponse.json();
         if (cancelled) return;
         if (!chartResponse.ok || !chartPayload.ok) throw new Error(chartPayload.message || "Chart data unavailable");
         const next = (chartPayload.candles ?? []) as Candle[];
-        setCandles(next);
         const live = Number(marketPayload.price);
+        setCandles(next);
         setQuote(Number.isFinite(live) ? live : null);
         const series = seriesRef.current;
-        if (series && next.length) series.setData(next.map((c) => ({ time: c.time as Time, open: c.open, high: c.high, low: c.low, close: c.close })) as CandlestickData[]);
+        if (series && next.length) {
+          const normalized = next.map((c) => ({ time: c.time as Time, open: c.open, high: c.high, low: c.low, close: c.close })) as CandlestickData[];
+          if (Number.isFinite(live)) {
+            const last = normalized[normalized.length - 1];
+            last.close = live;
+            last.high = Math.max(last.high, live);
+            last.low = Math.min(last.low, live);
+          }
+          series.setData(normalized);
+        }
         chartRef.current?.timeScale().fitContent();
         setStatus(marketPayload.marketOpen ? "LIVE · Twelve Data" : "MARKET CLOSED · latest provider quote");
       } catch (error) { if (!cancelled) setStatus(error instanceof Error ? error.message : "Market data unavailable"); }
