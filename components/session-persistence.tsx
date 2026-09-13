@@ -7,26 +7,49 @@ const KEY = "xauusd-poi:last-view";
 export default function SessionPersistence() {
   useEffect(() => {
     let restored = false;
+    let initialized = false;
+
+    const saveCurrent = () => {
+      if (!initialized) return;
+      const current = document.querySelector(".at-breadcrumb strong")?.textContent?.trim();
+      if (current) window.localStorage.setItem(KEY, current);
+    };
+
     const restore = () => {
       if (restored) return;
       const saved = window.localStorage.getItem(KEY);
-      if (!saved) return;
+      if (!saved) {
+        initialized = true;
+        return;
+      }
       const buttons = Array.from(document.querySelectorAll("aside button"));
       const target = buttons.find((button) => button.textContent?.trim().includes(saved));
       if (target) {
         restored = true;
+        initialized = true;
         (target as HTMLButtonElement).click();
       }
     };
 
+    const timer = window.setTimeout(restore, 350);
     const observer = new MutationObserver(() => {
-      const current = document.querySelector(".at-breadcrumb strong")?.textContent?.trim();
-      if (current) window.localStorage.setItem(KEY, current);
       restore();
+      saveCurrent();
     });
     observer.observe(document.body, { subtree: true, childList: true, characterData: true });
-    const timer = window.setTimeout(restore, 250);
-    return () => { observer.disconnect(); window.clearTimeout(timer); };
+
+    const clickHandler = (event: MouseEvent) => {
+      const button = (event.target as HTMLElement | null)?.closest("aside button");
+      if (!button) return;
+      window.setTimeout(saveCurrent, 0);
+    };
+    document.addEventListener("click", clickHandler, true);
+
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+      document.removeEventListener("click", clickHandler, true);
+    };
   }, []);
 
   return null;
