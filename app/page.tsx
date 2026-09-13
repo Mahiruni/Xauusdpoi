@@ -1,13 +1,17 @@
 import AppleTraderOS from "@/components/apple-trader-os";
+import BtcLiveCard from "@/components/btc-live-card";
 import ClientErrorBoundary from "@/components/client-error-boundary";
 import LiveFinancialChart from "@/components/live-financial-chart";
+import SessionPersistence from "@/components/session-persistence";
 
 export default function Page() {
   return (
     <>
+      <SessionPersistence />
       <ClientErrorBoundary title="Trader OS could not render.">
         <AppleTraderOS />
       </ClientErrorBoundary>
+      <BtcLiveCard />
       <ClientErrorBoundary title="The market chart could not render.">
         <section className="border-t border-black/[0.06] bg-[#f4f4f6] px-3 py-10 text-[#17181b] sm:px-6 md:px-10">
           <div className="mx-auto max-w-[1260px]">
