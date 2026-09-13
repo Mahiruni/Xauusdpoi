@@ -18,7 +18,7 @@ export default function SessionPersistence() {
     const restore = () => {
       if (restored) return;
       const saved = window.localStorage.getItem(KEY);
-      if (!saved) {
+      if (!saved || saved === "Strategy") {
         initialized = true;
         return;
       }
@@ -39,8 +39,15 @@ export default function SessionPersistence() {
     observer.observe(document.body, { subtree: true, childList: true, characterData: true });
 
     const clickHandler = (event: MouseEvent) => {
-      const button = (event.target as HTMLElement | null)?.closest("aside button");
+      const button = (event.target as HTMLElement | null)?.closest("aside button") as HTMLButtonElement | null;
       if (!button) return;
+      const label = button.textContent?.trim();
+      if (label === "Strategy") {
+        event.preventDefault();
+        window.localStorage.setItem(KEY, "Strategy");
+        window.location.assign("/strategy");
+        return;
+      }
       window.setTimeout(saveCurrent, 0);
     };
     document.addEventListener("click", clickHandler, true);
